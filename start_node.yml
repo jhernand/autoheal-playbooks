@@ -1,0 +1,32 @@
+---
+- name: Start node
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+
+  # Calculate the IP address from the `instance` input variable, and then do a
+  # reverse DNS lookup to find the FQDN, which in this environment is equal to
+  # the name of the virtual machine.
+  - set_fact:
+      vm_ip: "{{ instance | regex_replace(':.*$') }}"
+  - set_fact:
+      vm_name: "{{ lookup('dig', vm_ip + '/PTR') | regex_replace('\\.$') }}"
+
+  # Retrieve the facts of the virtual machine, so that we can check that it
+  # exists:
+  - ovirt_vms_facts:
+      pattern: "name={{ vm_name }}"
+  - debug:
+      var: ovirt_vms
+
+  # Fail if the virtual machine doesn't exist:
+  - fail:
+      msg: "Virtual machine '{{ vm_name }}' doesn't exist"
+    when: ovirt_vms | length == 0
+
+  # Make sure tha the virtual machine is running:
+  - ovirt_vms:
+      name: "{{ vm_name }}"
+      state: running
